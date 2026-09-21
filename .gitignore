@@ -1,0 +1,47 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual environment
+.venv/
+venv/
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local data
+data/*
+!data/.gitkeep
+
+# Logs
+*.log
+
+# Local model/cache files
+.cache/
+models/
+
+# Docker
+docker-data/
+
+# OS temporary files
+*.tmp
+
+.idea/
+
+# Python packaging
+*.egg-info/

@@ -1,0 +1,16 @@
+[project]
+name = "enterprise-document-intelligence"
+version = "0.1.0"
+description = "AI-Powered Enterprise Document Intelligence & Decision Assistant"
+requires-python = ">=3.11,<3.13"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
