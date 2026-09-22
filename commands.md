@@ -8,6 +8,10 @@ source .venv/bin/activate
 which python
 python --version
 
+### Python Commands
+python -m compileall app/common/db
+python tests/integration/test_health_record_repository.py
+
 ### Packages
 
 #### Install
@@ -46,7 +50,7 @@ docker compose down
 
 Use compose.dev.yaml if you don't want to rebuild docker image everytime on code change:
 
-docker compose -f compose.dev.yaml up --build
+docker compose -f compose.dev.yaml up -d --build
 docker compose -f compose.dev.yaml ps
 docker compose -f compose.dev.yaml down
 docker compose down
@@ -54,3 +58,26 @@ docker compose down
 #### Validate compose
     docker compose config
     docker compose -f compose.dev.yaml config
+
+## Docker postgre 
+    > (Check version) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "SELECT version();"
+    > (Check Tables) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "\dt"
+    > (Check Table Schema) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "\d health_records"
+    > (Check Records) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "SELECT id, message, created_at FROM health_records;"
+
+## Alembic 
+    It manage schema changes in versioned migration scripts
+
+    > (init alembic migration) alembic init migrations 
+
+            migrations/
+                ├── versions/
+                ├── env.py
+                ├── README
+                └── script.py.mako
+
+                alembic.ini
+    
+    > (generate migration) alembic revision --autogenerate -m "create health records" 
+
+    > (apply migration) alembic upgrade head 

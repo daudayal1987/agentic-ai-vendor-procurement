@@ -9,3 +9,24 @@ services:
     env_file:
       - .env
     restart: unless-stopped
+  
+  postgres:
+    image: postgres:16-alpine
+    container_name: enterprise-document-intelligence-postgres
+    environment:
+      POSTGRES_DB: enterprise_document_intelligence
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: local-dev-password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d enterprise_document_intelligence"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
