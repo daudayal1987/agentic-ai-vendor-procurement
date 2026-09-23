@@ -64,6 +64,9 @@ docker compose down
     > (Check Tables) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "\dt"
     > (Check Table Schema) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "\d health_records"
     > (Check Records) docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "SELECT id, message, created_at FROM health_records;"
+    > docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "\dt"
+    > docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "\d tenants"
+    > docker exec -it enterprise-document-intelligence-postgres psql -U app -d enterprise_document_intelligence -c "SELECT id, name, slug, status FROM tenants ORDER BY created_at;"
 
 ## Alembic 
     It manage schema changes in versioned migration scripts
@@ -81,3 +84,6 @@ docker compose down
     > (generate migration) alembic revision --autogenerate -m "create health records" 
 
     > (apply migration) alembic upgrade head 
+
+    > alembic current
+    > alembic heads
