@@ -11,6 +11,8 @@ dependencies = [
     "alembic>=1.20,<2.0",
     "python-dotenv>=1.0,<2.0",
     "pydantic-settings>=2.0,<3.0",
+    "PyJWT>=2.10,<3.0",
+    "pwdlib[argon2]>=0.2,<1.0",
 ]
 
 [build-system]
@@ -19,3 +21,8 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8,<9",
+]

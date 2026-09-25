@@ -4,6 +4,10 @@
 python3 -m venv .venv
 source .venv/bin/activate
 
+python -m pip install -e .
+pip install ".[dev]"
+
+
 #### verify
 which python
 python --version
@@ -11,6 +15,8 @@ python --version
 ### Python Commands
 python -m compileall app/common/db
 python tests/integration/test_health_record_repository.py
+
+pytest -q tests/unit/test_jwt.py 
 
 ### Packages
 
@@ -55,6 +61,11 @@ docker compose -f compose.dev.yaml ps
 docker compose -f compose.dev.yaml down
 docker compose down
 
+docker compose build api
+
+### Running python commands under docker
+docker compose exec api python -c "import jwt; print(jwt.__version__)"
+
 #### Validate compose
     docker compose config
     docker compose -f compose.dev.yaml config
@@ -84,6 +95,8 @@ docker compose down
     > (generate migration) alembic revision --autogenerate -m "create health records" 
 
     > (apply migration) alembic upgrade head 
+
+    > (delete revision) rm migrations/versions/bc489a7f9be5_add_password_hash_to_users.py
 
     > alembic current
     > alembic heads

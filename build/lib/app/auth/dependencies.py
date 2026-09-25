@@ -1,5 +1,3 @@
-import jwt
-
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -16,11 +14,7 @@ def get_current_principal(
         user_id = decode_access_token(
             credentials.credentials
         )
-    except (
-        jwt.ExpiredSignatureError,
-        jwt.InvalidTokenError,
-        ValueError,
-    ) as exc:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired access token",
