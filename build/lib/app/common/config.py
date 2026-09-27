@@ -17,7 +17,6 @@ class Settings(BaseSettings):
     database_user: str
     database_password: str
 
-    storage_backend: str = "local"
     queue_backend: str = "local"
     notification_backend: str = "local"
     vector_backend: str = "local"
@@ -26,6 +25,9 @@ class Settings(BaseSettings):
     jwt_secret_key: str
     jwt_algorithm: str = "HS256"
     jwt_access_token_expire_minutes: int = 30
+
+    storage_backend: str = "local"
+    storage_base_path: str = "data/storage"
 
     model_config = SettingsConfigDict(
         env_file=".env",

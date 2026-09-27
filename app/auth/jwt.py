@@ -26,7 +26,6 @@ def create_access_token(user_id: UUID) -> str:
         payload,
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
-        issuer="enterprise-document-intelligence",
     )
 
 
@@ -37,6 +36,7 @@ def decode_access_token(token: str) -> UUID:
         token,
         settings.jwt_secret_key,
         algorithms=[settings.jwt_algorithm],
+        issuer="enterprise-document-intelligence",
     )
 
     if payload.get("type") != "access":

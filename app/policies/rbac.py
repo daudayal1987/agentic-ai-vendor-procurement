@@ -13,6 +13,7 @@ class Permission(StrEnum):
 
     DOCUMENT_READ = "document:read"
     DOCUMENT_WRITE = "document:write"
+    DOCUMENT_LIST = "document:list"
 
     ANALYSIS_RUN = "analysis:run"
 
@@ -26,6 +27,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.TENANT_MANAGE,
             Permission.DOCUMENT_READ,
             Permission.DOCUMENT_WRITE,
+            Permission.DOCUMENT_LIST,
             Permission.ANALYSIS_RUN,
             Permission.APPROVAL_REVIEW,
         }
@@ -35,6 +37,7 @@ ROLE_PERMISSIONS: dict[Role, frozenset[Permission]] = {
             Permission.TENANT_READ,
             Permission.DOCUMENT_READ,
             Permission.DOCUMENT_WRITE,
+            Permission.DOCUMENT_LIST,
             Permission.ANALYSIS_RUN,
         }
     ),

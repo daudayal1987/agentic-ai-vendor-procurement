@@ -50,6 +50,7 @@ docker compose up -d --build
 
 docker compose ps
 docker compose logs api
+docker compose logs -f api
 
 docker compose down
 
@@ -62,6 +63,9 @@ docker compose -f compose.dev.yaml down
 docker compose down
 
 docker compose build api
+
+
+docker compose exec postgres psql -U app -d enterprise_document_intelligence
 
 ### Running python commands under docker
 docker compose exec api python -c "import jwt; print(jwt.__version__)"

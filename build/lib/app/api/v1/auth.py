@@ -1,5 +1,5 @@
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -14,8 +14,8 @@ router = APIRouter(
 )
 
 class LoginRequest(BaseModel):
-    email: str
-    password: str
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=128)
 
 
 class TokenResponse(BaseModel):
@@ -33,7 +33,7 @@ def login(
     repository = UserRepository(db)
 
     user = repository.get_by_email(
-        payload.email,
+        payload.email.strip().lower(),
     )
 
     if user is None:

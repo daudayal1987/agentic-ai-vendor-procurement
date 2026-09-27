@@ -18,12 +18,15 @@ def create_access_token(user_id: UUID) -> str:
         "sub": str(user_id),
         "iat": now,
         "exp": expires_at,
+        "iss": "enterprise-document-intelligence",
+        "type": "access",
     }
 
     return jwt.encode(
         payload,
         settings.jwt_secret_key,
         algorithm=settings.jwt_algorithm,
+        issuer="enterprise-document-intelligence",
     )
 
 
@@ -35,6 +38,9 @@ def decode_access_token(token: str) -> UUID:
         settings.jwt_secret_key,
         algorithms=[settings.jwt_algorithm],
     )
+
+    if payload.get("type") != "access":
+        raise ValueError("Invalid token type")
 
     subject = payload.get("sub")
 

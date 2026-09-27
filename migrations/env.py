@@ -8,6 +8,7 @@ from alembic import context
 from app.common.db.config import get_database_url
 from app.common.db.base import Base
 from app.common.db.models import HealthRecord
+from app.documents.models import Document
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.

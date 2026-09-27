@@ -3,9 +3,6 @@ from typing import BinaryIO
 
 from app.storage.interface import ObjectStorage
 
-from app.common.logging import get_logger   
-logger = get_logger("http")
-
 
 class LocalObjectStorage(ObjectStorage):
     """Filesystem-backed object storage implementation."""
@@ -35,18 +32,8 @@ class LocalObjectStorage(ObjectStorage):
         path = self._resolve_path(object_key)
         path.parent.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Uploading object to {path}, content_type: {content_type}")
-
-        try:
-
-            if hasattr(content, "seek"):
-                content.seek(0)
-
-            with path.open("wb") as destination:
-                destination.write(content.read())
-        except Exception as e:
-            logger.error(f"Failed to upload object to {path}: {e}")
-            raise
+        with path.open("wb") as destination:
+            destination.write(content.read())
 
     def download(self, object_key: str) -> bytes:
         path = self._resolve_path(object_key)
