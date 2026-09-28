@@ -45,4 +45,4 @@ docker-data/
 
 # Python packaging
 *.egg-info/
-./build/
+build
