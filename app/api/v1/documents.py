@@ -12,9 +12,9 @@ from app.tenants.context import TenantContext
 from app.auth.authorization import require_permission
 from app.policies.rbac import Permission
 
-
-from app.common.logging import get_logger   
-logger = get_logger("http")
+from app.documents.parsing.dependencies import get_document_parsing_service
+from app.documents.parsing.service import DocumentParsingService
+from app.documents.parsing.interface import ParsedDocument
 
 router = APIRouter(
     prefix="/documents",
@@ -34,8 +34,6 @@ async def upload_document(
 ):
 
     content = await file.read()
-    logger.info(f"Content read from file: {len(content)} bytes, filename: {file.filename}, content_type: {file.content_type}")
-    logger.info(f"Content preview (first 100 bytes): {content[:100]}")  # Log the first 100 bytes of content for debugging
 
     try:
         document = document_service.upload_document(
@@ -90,3 +88,23 @@ def list_documents(
     return document_service.list_documents(
         tenant_id=tenant_context.tenant_id,
     )
+
+
+@router.post(
+    "/{document_id}/parse",
+)
+def parse_document(
+    document_id: UUID,
+    tenant_context: TenantContext = Depends(require_permission(Permission.DOCUMENT_READ)),
+    parsing_service: DocumentParsingService = Depends(get_document_parsing_service),
+) -> ParsedDocument:
+    try:
+        return parsing_service.parse_document(
+            tenant_id=tenant_context.tenant_id,
+            document_id=document_id,
+        )
+    except FileNotFoundError as exc:
+        raise HTTPException(
+            status_code=404,
+            detail="Document not found",
+        ) from exc

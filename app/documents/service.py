@@ -68,7 +68,7 @@ class DocumentService:
         safe_filename = self._safe_filename(filename)
 
         object_key = (
-            f"documents/{tenant_id}/{document_id}/{filename}"
+            f"documents/{tenant_id}/{document_id}/{safe_filename}"
         )
 
         self.storage.upload(
