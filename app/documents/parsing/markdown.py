@@ -3,6 +3,7 @@ from uuid import UUID
 from app.documents.parsing.interface import (
     DocumentParser,
     ParsedDocument,
+    ParsedSegment,
 )
 
 
@@ -20,10 +21,19 @@ class MarkdownDocumentParser(DocumentParser):
         content: bytes,
         content_type: str,
     ) -> ParsedDocument:
+
         text = content.decode("utf-8")
 
         return ParsedDocument(
             document_id=document_id,
             text=text,
             content_type=content_type,
+            segments=(
+                ParsedSegment(
+                    text=text,
+                    metadata={
+                        "source_type": "markdown",
+                    },
+                ),
+            ),
         )

@@ -5,6 +5,7 @@ import pymupdf
 from app.documents.parsing.interface import (
     DocumentParser,
     ParsedDocument,
+    ParsedSegment,
 )
 
 
@@ -25,18 +26,33 @@ class PDFDocumentParser(DocumentParser):
             filetype="pdf",
         )
 
-        pages: list[str] = []
-
         try:
-            for page in pdf:
-                pages.append(page.get_text())
+            segments: list[ParsedSegment] = []
+
+            for page_number, page in enumerate(pdf, start=1):
+                page_text = page.get_text()
+
+                if not page_text.strip():
+                    continue
+
+                segments.append(
+                    ParsedSegment(
+                        text=page_text,
+                        metadata={
+                            "page": page_number,
+                        },
+                    )
+                )
+
+            return ParsedDocument(
+                document_id=document_id,
+                text="\n\n".join(
+                    segment.text
+                    for segment in segments
+                ),
+                content_type=content_type,
+                segments=tuple(segments),
+            )
+
         finally:
             pdf.close()
-
-        text = "\n\n".join(pages)
-
-        return ParsedDocument(
-            document_id=document_id,
-            text=text,
-            content_type=content_type,
-        )

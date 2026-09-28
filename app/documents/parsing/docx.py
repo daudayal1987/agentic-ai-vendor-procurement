@@ -6,6 +6,7 @@ from docx import Document
 from app.documents.parsing.interface import (
     DocumentParser,
     ParsedDocument,
+    ParsedSegment,
 )
 
 
@@ -26,15 +27,33 @@ class DOCXDocumentParser(DocumentParser):
 
         document = Document(BytesIO(content))
 
-        paragraphs = [
-            paragraph.text
-            for paragraph in document.paragraphs
-        ]
+        segments: list[ParsedSegment] = []
 
-        text = "\n\n".join(paragraphs)
+        for paragraph_index, paragraph in enumerate(
+            document.paragraphs
+        ):
+            text = paragraph.text
+
+            if not text.strip():
+                continue
+
+            segments.append(
+                ParsedSegment(
+                    text=text,
+                    metadata={
+                        "paragraph_index": paragraph_index,
+                    },
+                )
+            )
+
+        text = "\n\n".join(
+            segment.text
+            for segment in segments
+        )
 
         return ParsedDocument(
             document_id=document_id,
             text=text,
             content_type=content_type,
+            segments=tuple(segments),
         )
