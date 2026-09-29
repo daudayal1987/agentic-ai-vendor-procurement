@@ -20,6 +20,7 @@ class SearchDocumentsInput(BaseModel):
             "for the enterprise document collection."
         ),
     )
+
     top_k: int = Field(
         default=5,
         ge=1,
@@ -49,21 +50,34 @@ def create_search_documents_tool(
     """
     Create a tenant-scoped search_documents tool.
 
-    The LLM controls only query and top_k.
+    The LLM controls only:
+        - query
+        - top_k
 
-    Runtime code controls tenant context and retriever construction.
+    Runtime code controls:
+        - tenant_context
+        - tenant_id
+        - retriever
+        - authorization context
     """
 
     def search_documents(
         query: str,
         top_k: int = 5,
     ) -> list[dict[str, Any]]:
+        """
+        Search enterprise documents within the current tenant.
+
+        Tenant identity is supplied by trusted runtime context and is
+        never accepted from the LLM.
+        """
+
         retriever = retriever_factory(tenant_context)
 
         results = retriever.retrieve(
             query=query,
-            top_k=top_k,
             tenant_id=tenant_context.tenant_id,
+            top_k=top_k,
         )
 
         return [

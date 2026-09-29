@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     storage_backend: str = "local"
     storage_base_path: str = "data/storage"
 
+    embedding_model_name: str
+    embedding_device: str | None = None
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
