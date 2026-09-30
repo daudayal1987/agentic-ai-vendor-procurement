@@ -6,6 +6,7 @@ from langchain_core.messages import (
     AIMessage,
     BaseMessage,
     HumanMessage,
+    SystemMessage,
     ToolMessage,
 )
 from langchain_core.tools import BaseTool
@@ -16,6 +17,23 @@ from app.memory.store import (
     MemoryStore,
 )
 from app.memory.tools import create_memory_tools
+
+MEMORY_BEHAVIOR_PROMPT = """
+You have access to long-term memory for the current user.
+
+Use search_memory when the user's question depends on a
+durable user-specific fact, preference, or previous decision.
+
+Use save_memory when the user explicitly provides information
+that should remain useful in future conversations.
+
+Do not use memory tools for questions that do not depend on
+user-specific information.
+
+When memory is retrieved, use the retrieved information as
+context for your answer. Do not invent memories that were
+not retrieved.
+""".strip()
 
 
 class AgentState(TypedDict):
@@ -246,8 +264,19 @@ class LangGraphReActAgent:
                 "producing a final answer"
             )
 
+
+        messages = state["messages"]
+
+        if (self._memory_store is not None and self._user_id is not None):
+            messages = [
+                SystemMessage(
+                    content=MEMORY_BEHAVIOR_PROMPT
+                ),
+                *messages,
+            ]
+
         response = self._model.invoke(
-            state["messages"]
+            messages
         )
 
         if not isinstance(

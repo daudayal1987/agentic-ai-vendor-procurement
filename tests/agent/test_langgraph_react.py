@@ -5,6 +5,10 @@ from typing import Any
 import pytest
 from langchain_core.messages import (
     AIMessage,
+    BaseMessage,
+    HumanMessage,
+    SystemMessage,
+    ToolMessage,
 )
 from langchain_core.tools import StructuredTool
 
