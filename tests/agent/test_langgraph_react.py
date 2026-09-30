@@ -255,3 +255,109 @@ def test_invalid_max_iterations_is_rejected() -> None:
             tools=[make_tool()],
             max_iterations=0,
         )
+
+
+def test_same_thread_remembers_previous_message() -> None:
+    tool = make_tool()
+
+    bound_model = FakeBoundModel()
+
+    agent = LangGraphReActAgent(
+        model=FakeModel(bound_model),
+        tools=[tool],
+    )
+
+    agent.run(
+        "Analyze Vendor X.",
+        thread_id="vendor-analysis-1",
+    )
+
+    agent.run(
+        "What about its SLA?",
+        thread_id="vendor-analysis-1",
+    )
+
+    second_turn_messages = bound_model.messages[-1]
+
+    # print(bound_model.messages)
+
+    human_messages = [
+        message
+        for message in second_turn_messages
+        if message.type == "human"
+    ]
+
+    assert len(human_messages) == 2
+
+    assert human_messages[0].content == (
+        "Analyze Vendor X."
+    )
+
+    assert human_messages[1].content == (
+        "What about its SLA?"
+    )
+
+
+def test_different_threads_do_not_share_short_term_memory() -> None:
+    tool = make_tool()
+
+    bound_model = FakeBoundModel()
+
+    agent = LangGraphReActAgent(
+        model=FakeModel(bound_model),
+        tools=[tool],
+    )
+
+    agent.run(
+        "Analyze Vendor X.",
+        thread_id="thread-a",
+    )
+
+    agent.run(
+        "What about its SLA?",
+        thread_id="thread-b",
+    )
+
+    second_turn_messages = bound_model.messages[-1]
+
+    # print(bound_model.messages)
+
+    human_messages = [
+        message
+        for message in second_turn_messages
+        if message.type == "human"
+    ]
+
+    assert len(human_messages) == 1
+
+    assert human_messages[0].content == (
+        "What about its SLA?"
+    )
+
+
+def test_same_thread_preserves_multiple_turns() -> None:
+    tool = make_tool()
+    bound_model = FakeBoundModel()
+    agent = LangGraphReActAgent(
+        model=FakeModel(bound_model),
+        tools=[tool],
+    )
+
+    agent.run(
+        "Analyze Vendor X.",
+        thread_id="multi-turn",
+    )
+    agent.run(
+        "What about its SLA?",
+        thread_id="multi-turn",
+    )
+
+    third_turn_messages = bound_model.messages[-1]
+
+    human_messages = [
+        message
+        for message in third_turn_messages
+        if message.type == "human"
+    ]
+
+    assert len(human_messages) == 2

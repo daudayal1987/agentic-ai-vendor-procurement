@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Sequence, TypedDict
+from typing import Any, Sequence, TypedDict, Annotated
 
 from langchain_core.messages import (
     AIMessage,
@@ -9,13 +9,14 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.tools import BaseTool
-from langgraph.graph import END, START, StateGraph
+from langgraph.graph import END, START, StateGraph, add_messages
+from langgraph.checkpoint.memory import InMemorySaver
 
 
 class AgentState(TypedDict):
     """State carried through the LangGraph workflow."""
 
-    messages: list[BaseMessage]
+    messages: Annotated[list[BaseMessage], add_messages]
     iterations: int
     events: list[dict[str, Any]]
 
@@ -105,15 +106,27 @@ class LangGraphReActAgent:
             "agent",
         )
 
-        self._graph = builder.compile()
+        self._checkpointer = InMemorySaver()
 
-    def run(self,question: str,) -> dict[str, Any]:
+        self._graph = builder.compile(
+            checkpointer=self._checkpointer
+        )
+
+    def run(self,question: str, *, thread_id: str = "default",) -> dict[str, Any]:
         if (
             not isinstance(question, str)
             or not question.strip()
         ):
             raise ValueError(
                 "question must be a non-empty string"
+            )
+
+        if (
+            not isinstance(thread_id, str)
+            or not thread_id.strip()
+        ):
+            raise ValueError(
+                "thread_id must be a non-empty string"
             )
 
         initial_state: AgentState = {
@@ -127,7 +140,12 @@ class LangGraphReActAgent:
         }
 
         result = self._graph.invoke(
-            initial_state
+            initial_state,
+            config = {
+                "configurable": {
+                    "thread_id": thread_id,
+                }
+            }
         )
 
         messages = result["messages"]
