@@ -8,3 +8,4 @@ class TenantContext:
     user_id: UUID | None = None
     roles: tuple[str, ...] = ()
     permissions: tuple[str, ...] = ()
+    enabled_services: tuple[str, ...] = ()

@@ -2,6 +2,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from uuid import uuid4
+
+from app.tenants.context import TenantContext
+
 import pytest
 from langchain_core.messages import (
     AIMessage,
@@ -19,6 +23,15 @@ from app.agents.langgraph_react import (
 from app.memory.store import InMemoryMemoryStore, MemoryKey
 from app.memory.tools import create_memory_tools 
 
+
+def make_tenant_context() -> TenantContext:
+    return TenantContext(
+        tenant_id=uuid4(),
+        user_id=uuid4(),
+        roles=("analyst",),
+        permissions=("document:read",),
+        enabled_services=("document_search",),
+    )
 
 def make_tool(
     name: str = "search_documents",
@@ -317,6 +330,7 @@ def test_graph_executes_tool_and_finishes() -> None:
         model=FakeModel(bound_model),
         tools=[make_tool()],
         max_iterations=5,
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -348,6 +362,7 @@ def test_graph_passes_tool_result_back_to_model() -> None:
     agent = LangGraphReActAgent(
         model=FakeModel(bound_model),
         tools=[make_tool()],
+        tenant_context=make_tenant_context(),
     )
 
     agent.run(
@@ -372,6 +387,7 @@ def test_empty_question_is_rejected() -> None:
             FakeBoundModel()
         ),
         tools=[make_tool()],
+        tenant_context=make_tenant_context(),
     )
 
     with pytest.raises(ValueError):
@@ -384,6 +400,7 @@ def test_invalid_thread_id_is_rejected() -> None:
             FakeBoundModel()
         ),
         tools=[make_tool()],
+        tenant_context=make_tenant_context(),
     )
 
     with pytest.raises(ValueError):
@@ -401,6 +418,7 @@ def test_invalid_max_iterations_is_rejected() -> None:
             ),
             tools=[make_tool()],
             max_iterations=0,
+            tenant_context=make_tenant_context(),
         )
 
 
@@ -409,6 +427,7 @@ def test_max_iterations_protects_graph() -> None:
         model=AlwaysToolModel(),
         tools=[make_tool()],
         max_iterations=2,
+        tenant_context=make_tenant_context(),
     )
 
     with pytest.raises(RuntimeError):
@@ -421,6 +440,7 @@ def test_unknown_tool_is_rejected() -> None:
     agent = LangGraphReActAgent(
         model=UnknownToolModel(),
         tools=[make_tool()],
+        tenant_context=make_tenant_context(),
     )
 
     with pytest.raises(RuntimeError):
@@ -444,6 +464,7 @@ def test_duplicate_tool_names_are_rejected() -> None:
                 FakeBoundModel()
             ),
             tools=[first, second],
+            tenant_context=make_tenant_context(),
         )
 
 
@@ -453,6 +474,7 @@ def test_same_thread_remembers_previous_message() -> None:
     agent = LangGraphReActAgent(
         model=FakeModel(bound_model),
         tools=[make_tool()],
+        tenant_context=make_tenant_context(),
     )
 
     agent.run(
@@ -490,6 +512,7 @@ def test_different_threads_do_not_share_history() -> None:
     agent = LangGraphReActAgent(
         model=FakeModel(bound_model),
         tools=[make_tool()],
+        tenant_context=make_tenant_context(),
     )
 
     agent.run(
@@ -527,6 +550,7 @@ def test_long_term_memory_tool_is_added() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     assert "save_memory" in model.tools
@@ -543,6 +567,7 @@ def test_agent_can_save_long_term_memory() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -580,6 +605,7 @@ def test_agent_can_read_long_term_memory() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -613,6 +639,7 @@ def test_long_term_memory_survives_thread_change() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     writer_agent.run(
@@ -628,6 +655,7 @@ def test_long_term_memory_survives_thread_change() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = reader_agent.run(
@@ -651,6 +679,7 @@ def test_users_have_isolated_long_term_memory() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     writer_agent.run(
@@ -666,6 +695,7 @@ def test_users_have_isolated_long_term_memory() -> None:
         tools=[make_tool()],
         memory_store=memory_store,
         user_id="user-2",
+        tenant_context=make_tenant_context(),
     )
 
     result = reader_agent.run(
@@ -675,4 +705,84 @@ def test_users_have_isolated_long_term_memory() -> None:
 
     assert result["answer"] == (
         "No preference found."
+    )
+
+
+def test_agent_blocks_unauthorized_tool_execution() -> None:
+    executed = False
+
+    def search_documents(query: str) -> str:
+        nonlocal executed
+        executed = True
+        return "secret data"
+
+    tool = StructuredTool.from_function(
+        func=search_documents,
+        name="search_documents",
+        description="Search enterprise documents.",
+    )
+
+    bound_model = FakeBoundModel()
+
+    agent = LangGraphReActAgent(
+        model=FakeModel(bound_model),
+        tools=[tool],
+        tenant_context=TenantContext(
+            tenant_id=uuid4(),
+            user_id=uuid4(),
+            roles=("reviewer",),
+            permissions=(),
+            enabled_services=("document_search",),
+        ),
+    )
+
+    result = agent.run(
+        "Search the enterprise documents."
+    )
+
+    assert executed is False
+
+    assert any(
+        event["event_type"] == "policy_denied"
+        for event in result["events"]
+    )
+
+
+def test_agent_executes_authorized_tool() -> None:
+    executed = False
+
+    def search_documents(query: str) -> str:
+        nonlocal executed
+        executed = True
+        return "authorized data"
+
+    tool = StructuredTool.from_function(
+        func=search_documents,
+        name="search_documents",
+        description="Search enterprise documents.",
+    )
+
+    bound_model = FakeBoundModel()
+
+    agent = LangGraphReActAgent(
+        model=FakeModel(bound_model),
+        tools=[tool],
+        tenant_context=TenantContext(
+            tenant_id=uuid4(),
+            user_id=uuid4(),
+            roles=("analyst",),
+            permissions=("document:read",),
+            enabled_services=("document_search",),
+        ),
+    )
+
+    result = agent.run(
+        "Search the enterprise documents."
+    )
+
+    assert executed is True
+
+    assert any(
+        event["event_type"] == "tool_result"
+        for event in result["events"]
     )

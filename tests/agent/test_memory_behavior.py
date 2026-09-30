@@ -7,6 +7,19 @@ from langchain_core.messages import AIMessage
 from app.agents.langgraph_react import LangGraphReActAgent
 from app.memory.store import InMemoryMemoryStore, MemoryKey
 
+from uuid import uuid4
+
+from app.tenants.context import TenantContext
+
+
+def make_tenant_context() -> TenantContext:
+    return TenantContext(
+        tenant_id=uuid4(),
+        user_id=uuid4(),
+        roles=("analyst",),
+        permissions=("document:read",),
+        enabled_services=("document_search",),
+    )
 
 class MemoryAwareModel:
     """
@@ -141,6 +154,7 @@ def test_relevant_question_searches_memory() -> None:
         tools=[],
         memory_store=store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -175,6 +189,7 @@ def test_retrieved_memory_affects_answer() -> None:
         tools=[],
         memory_store=store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -204,6 +219,7 @@ def test_unrelated_question_does_not_search_memory() -> None:
         tools=[],
         memory_store=store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -233,6 +249,7 @@ def test_agent_can_save_new_memory() -> None:
         tools=[],
         memory_store=store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     result = agent.run(
@@ -271,6 +288,7 @@ def test_memory_update_replaces_existing_value() -> None:
         tools=[],
         memory_store=store,
         user_id="user-1",
+        tenant_context=make_tenant_context(),
     )
 
     agent.run(

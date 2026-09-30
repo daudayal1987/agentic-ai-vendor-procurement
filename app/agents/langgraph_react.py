@@ -18,6 +18,10 @@ from app.memory.store import (
 )
 from app.memory.tools import create_memory_tools
 
+from app.tenants.context import TenantContext
+from app.agents.middleware import ToolExecutionMiddleware
+from app.policies.tool_policy import ToolPolicy
+
 MEMORY_BEHAVIOR_PROMPT = """
 You have access to long-term memory for the current user.
 
@@ -67,6 +71,7 @@ class LangGraphReActAgent:
         max_iterations: int = 5,
         memory_store: MemoryStore | None = None,
         user_id: str | None = None,
+        tenant_context: TenantContext | None = None,
     ) -> None:
         if max_iterations <= 0:
             raise ValueError(
@@ -97,6 +102,7 @@ class LangGraphReActAgent:
         self._max_iterations = max_iterations
         self._memory_store = memory_store
         self._user_id = user_id
+        self._tenant_context = tenant_context
 
         # Start with application tools.
         all_tools = list(application_tools)
@@ -351,10 +357,49 @@ class LangGraphReActAgent:
                     f"unregistered tool: {tool_name}"
                 )
 
-            try:
-                result = tool.invoke(
-                    tool_call["args"]
+            if self._tenant_context is None:
+                raise RuntimeError(
+                    "Tenant context is required for tool execution"
                 )
+
+            middleware = ToolExecutionMiddleware(
+                policy=ToolPolicy(),
+                tenant_context=self._tenant_context,
+            )
+
+            try:
+                # result = tool.invoke(
+                #     tool_call["args"]
+                # )
+
+                execution = middleware.execute(
+                    tool_name=tool_name,
+                    tool=lambda: tool.invoke(
+                        tool_call["args"]
+                    ),
+                )
+
+                if not execution.allowed:
+                    tool_messages.append(
+                        ToolMessage(
+                            content=execution.reason or "Tool execution denied.",
+                            tool_call_id=tool_call_id,
+                        )
+                    )
+
+                    events.append(
+                        {
+                            "event_type": "policy_denied",
+                            "iteration": state["iterations"],
+                            "tool_name": tool_name,
+                            "tool_call_id": tool_call_id,
+                            "reason": execution.reason,
+                        }
+                    )
+
+                    continue
+
+                result = execution.result
             except Exception:
                 tool_messages.append(
                     ToolMessage(
