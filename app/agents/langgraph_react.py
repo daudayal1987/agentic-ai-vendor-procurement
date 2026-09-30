@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Any, Sequence, TypedDict, Annotated
+from typing import Annotated, Any, Sequence, TypedDict
 
 from langchain_core.messages import (
     AIMessage,
@@ -9,8 +9,13 @@ from langchain_core.messages import (
     ToolMessage,
 )
 from langchain_core.tools import BaseTool
-from langgraph.graph import END, START, StateGraph, add_messages
 from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, START, StateGraph, add_messages
+
+from app.memory.store import (
+    MemoryStore,
+)
+from app.memory.tools import create_memory_tools
 
 
 class AgentState(TypedDict):
@@ -23,42 +28,47 @@ class AgentState(TypedDict):
 
 class LangGraphReActAgent:
     """
-    Minimal LangGraph implementation of the Day 16 ReAct loop.
+    Simple LangGraph ReAct agent.
 
-    Graph:
+    Short-term memory:
+        thread_id -> LangGraph checkpointer
 
-        START
-          ↓
-        agent
-          ↓
-        should_continue
-        ↙          ↘
-      tools       END
-        ↓
-      agent
-        ↓
-      ...
+    Long-term memory:
+        user_id -> MemoryStore
 
-    Runtime controls:
-        - registered tools
-        - tool execution
-        - iteration limit
-
-    The graph state contains messages and observable events.
-    Private model reasoning is not intentionally stored.
+    Memory is exposed to the model through ReAct tools:
+        - save_memory
+        - search_memory
     """
 
-    def __init__(self,model: Any,tools: Sequence[BaseTool],*,max_iterations: int = 5,) -> None:
+    def __init__(
+        self,
+        model: Any,
+        tools: Sequence[BaseTool],
+        *,
+        max_iterations: int = 5,
+        memory_store: MemoryStore | None = None,
+        user_id: str | None = None,
+    ) -> None:
         if max_iterations <= 0:
             raise ValueError(
                 "max_iterations must be greater than zero"
             )
 
-        tool_list = list(tools)
+        if user_id is not None:
+            if (
+                not isinstance(user_id, str)
+                or not user_id.strip()
+            ):
+                raise ValueError(
+                    "user_id must be a non-empty string"
+                )
+
+        application_tools = list(tools)
 
         tool_names = [
             tool.name
-            for tool in tool_list
+            for tool in application_tools
         ]
 
         if len(tool_names) != len(set(tool_names)):
@@ -66,14 +76,51 @@ class LangGraphReActAgent:
                 "Tool names must be unique"
             )
 
-        self._model = model.bind_tools(tool_list)
+        self._max_iterations = max_iterations
+        self._memory_store = memory_store
+        self._user_id = user_id
+
+        # Start with application tools.
+        all_tools = list(application_tools)
+
+        # Add long-term memory tools once.
+        #
+        # The tools are scoped to this user.
+        if (
+            memory_store is not None
+            and user_id is not None
+        ):
+            memory_tools = create_memory_tools(
+                memory_store,
+                user_id=user_id,
+            )
+
+            existing_names = {
+                tool.name
+                for tool in all_tools
+            }
+
+            for tool in memory_tools:
+                if tool.name in existing_names:
+                    raise ValueError(
+                        "Memory tool name conflicts "
+                        f"with existing tool: {tool.name}"
+                    )
+
+            all_tools.extend(memory_tools)
 
         self._tools = {
             tool.name: tool
-            for tool in tool_list
+            for tool in all_tools
         }
 
-        self._max_iterations = max_iterations
+        # Bind tools ONCE.
+        #
+        # This model is reused by every agent node
+        # execution for this agent instance.
+        self._model = model.bind_tools(
+            all_tools
+        )
 
         builder = StateGraph(AgentState)
 
@@ -109,10 +156,15 @@ class LangGraphReActAgent:
         self._checkpointer = InMemorySaver()
 
         self._graph = builder.compile(
-            checkpointer=self._checkpointer
+            checkpointer=self._checkpointer,
         )
 
-    def run(self,question: str, *, thread_id: str = "default",) -> dict[str, Any]:
+    def run(
+        self,
+        question: str,
+        *,
+        thread_id: str = "default",
+    ) -> dict[str, Any]:
         if (
             not isinstance(question, str)
             or not question.strip()
@@ -141,11 +193,11 @@ class LangGraphReActAgent:
 
         result = self._graph.invoke(
             initial_state,
-            config = {
+            config={
                 "configurable": {
                     "thread_id": thread_id,
                 }
-            }
+            },
         )
 
         messages = result["messages"]
@@ -176,10 +228,18 @@ class LangGraphReActAgent:
             ),
         }
 
-    def _agent_node(self,state: AgentState,) -> dict[str, Any]:
-        next_iteration = state["iterations"] + 1
+    def _agent_node(
+        self,
+        state: AgentState,
+    ) -> dict[str, Any]:
+        next_iteration = (
+            state["iterations"] + 1
+        )
 
-        if next_iteration > self._max_iterations:
+        if (
+            next_iteration
+            > self._max_iterations
+        ):
             raise RuntimeError(
                 "LangGraph agent reached "
                 "max_iterations without "
@@ -195,8 +255,7 @@ class LangGraphReActAgent:
             AIMessage,
         ):
             raise TypeError(
-                "The bound model must return "
-                "an AIMessage"
+                "The model must return an AIMessage"
             )
 
         events = list(
@@ -229,21 +288,22 @@ class LangGraphReActAgent:
             "events": events,
         }
 
-    def _tool_node(self,state: AgentState) -> dict[str, Any]:
-        messages = state["messages"]
-
-        last_message = messages[-1]
+    def _tool_node(
+        self,
+        state: AgentState,
+    ) -> dict[str, Any]:
+        last_message = state["messages"][-1]
 
         if not isinstance(
             last_message,
             AIMessage,
         ):
             raise TypeError(
-                "Tool node expected the previous "
-                "message to be an AIMessage"
+                "Tool node expected an AIMessage"
             )
 
         tool_messages: list[ToolMessage] = []
+
         events = list(
             state["events"]
         )
@@ -258,8 +318,8 @@ class LangGraphReActAgent:
 
             if tool is None:
                 raise RuntimeError(
-                    "Model requested an unregistered "
-                    f"tool: {tool_name}"
+                    "Model requested an "
+                    f"unregistered tool: {tool_name}"
                 )
 
             try:
@@ -267,15 +327,11 @@ class LangGraphReActAgent:
                     tool_call["args"]
                 )
             except Exception:
-                observation = (
-                    "Tool execution failed. "
-                    "The requested action could not "
-                    "be completed."
-                )
-
                 tool_messages.append(
                     ToolMessage(
-                        content=observation,
+                        content=(
+                            "Tool execution failed."
+                        ),
                         tool_call_id=tool_call_id,
                     )
                 )
@@ -313,7 +369,9 @@ class LangGraphReActAgent:
         }
 
     @staticmethod
-    def _should_continue(state: AgentState,) -> str:
+    def _should_continue(
+        state: AgentState,
+    ) -> str:
         last_message = state["messages"][-1]
 
         if not isinstance(
@@ -321,8 +379,7 @@ class LangGraphReActAgent:
             AIMessage,
         ):
             raise TypeError(
-                "Routing expected the latest "
-                "message to be an AIMessage"
+                "Routing expected an AIMessage"
             )
 
         if last_message.tool_calls:
@@ -331,7 +388,9 @@ class LangGraphReActAgent:
         return "end"
 
 
-def _message_text(message: AIMessage,) -> str:
+def _message_text(
+    message: AIMessage,
+) -> str:
     content = message.content
 
     if isinstance(
