@@ -20,6 +20,7 @@ dependencies = [
     "faiss-cpu>=1.15,<2.0",
     "langchain",
     "langchain-ollama",
+    "langgraph"
 ]
 
 [build-system]

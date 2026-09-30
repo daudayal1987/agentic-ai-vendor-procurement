@@ -69,13 +69,7 @@ class ReActAgent:
     Private chain-of-thought is never exposed or persisted.
     """
 
-    def __init__(
-        self,
-        model: Any,
-        tools: Sequence[BaseTool],
-        *,
-        max_iterations: int = 5,
-    ) -> None:
+    def __init__(self,model: Any,tools: Sequence[BaseTool],*,max_iterations: int = 5,) -> None:
         if max_iterations <= 0:
             raise ValueError(
                 "max_iterations must be greater than zero"
@@ -102,10 +96,7 @@ class ReActAgent:
 
         self._max_iterations = max_iterations
 
-    def run(
-        self,
-        question: str,
-    ) -> ReActResult:
+    def run(self,question: str,) -> ReActResult:
         """
         Execute the ReAct loop.
 
