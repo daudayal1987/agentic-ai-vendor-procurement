@@ -58,3 +58,27 @@ def require_permission(permission: Permission):
         )
 
     return dependency
+
+
+def has_tenant_permission(
+    db: Session,
+    tenant_id: UUID,
+    user_id: UUID,
+    permission: Permission,
+) -> bool:
+    membership_repository = TenantMembershipRepository(db)
+
+    membership = membership_repository.get_active_membership(
+        tenant_id=tenant_id,
+        user_id=user_id,
+    )
+
+    if membership is None:
+        return False
+
+    try:
+        role = Role(membership.role)
+    except ValueError:
+        return False
+
+    return has_permission(role, permission)
