@@ -1,59 +1,36 @@
 from __future__ import annotations
 
-from contextlib import AsyncExitStack
-from pathlib import Path
 from typing import Any
 
-from mcp import ClientSession, StdioServerParameters
-from mcp.client.stdio import stdio_client
+from mcp import Client
+from mcp.client.stdio import StdioServerParameters
+
+from app.mcp.request_context import request_context_to_meta
 
 
 class DocumentMCPClient:
-    """
-    MCP client for the enterprise document MCP server.
-
-    Day 1 implementation:
-        - stdio transport
-        - explicit server process
-        - tool discovery
-        - tool invocation
-    """
+    """Application wrapper around the MCP 2.x high-level Client."""
 
     def __init__(
         self,
-        server_script: Path,
+        server: str | StdioServerParameters | Any,
+        *,
+        identity_token: str,
     ) -> None:
-        self.server_script = server_script
+        if not identity_token:
+            raise ValueError("identity_token must not be empty")
 
-        self._exit_stack = AsyncExitStack()
-        self._session: ClientSession | None = None
+        self._client = Client(server)
+        self._identity_token = identity_token
+        self._connected = False
 
     async def connect(self) -> None:
-        server_params = StdioServerParameters(
-            command="python",
-            args=[str(self.server_script)],
-        )
-
-        read_stream, write_stream = await self._exit_stack.enter_async_context(
-            stdio_client(server_params)
-        )
-
-        session = await self._exit_stack.enter_async_context(
-            ClientSession(
-                read_stream,
-                write_stream,
-            )
-        )
-
-        await session.initialize()
-
-        self._session = session
+        await self._client.__aenter__()
+        self._connected = True
 
     async def list_tools(self) -> list[Any]:
-        session = self._require_session()
-
-        result = await session.list_tools()
-
+        self._require_connected()
+        result = await self._client.list_tools()
         return list(result.tools)
 
     async def call_tool(
@@ -61,20 +38,18 @@ class DocumentMCPClient:
         name: str,
         arguments: dict[str, Any],
     ) -> Any:
-        session = self._require_session()
-
-        return await session.call_tool(
+        self._require_connected()
+        return await self._client.call_tool(
             name,
             arguments,
+            meta=request_context_to_meta(self._identity_token),
         )
 
     async def close(self) -> None:
-        await self._exit_stack.aclose()
+        if self._connected:
+            await self._client.__aexit__(None, None, None)
+            self._connected = False
 
-    def _require_session(self) -> ClientSession:
-        if self._session is None:
-            raise RuntimeError(
-                "MCP client is not connected"
-            )
-
-        return self._session
+    def _require_connected(self) -> None:
+        if not self._connected:
+            raise RuntimeError("MCP client is not connected")

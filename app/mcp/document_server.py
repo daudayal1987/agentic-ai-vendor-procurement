@@ -1,73 +1,75 @@
 from __future__ import annotations
 
-import asyncio
-from uuid import UUID
+from pydantic import Field
+from typing import Callable
 
 from mcp.server import MCPServer
+from mcp.server.mcpserver import Context
 
+from app.mcp.request_context import RequestContextSigner, get_request_context, request_identity_middleware
+from app.retrieval.dense import DenseRetriever
 from app.retrieval.service import DocumentSearchService
 from app.tenants.context import TenantContext
 
 
-# Initialize your server instance
-server = MCPServer(
-    name="document-mcp-server",
-    title="Enterprise Document MCP Server",
-    description="MCP server exposing tenant-scoped enterprise document capabilities.",
-    version="0.1.0",
-)
+def create_document_mcp_server(
+    *,
+    retriever_factory: Callable[[TenantContext], DenseRetriever],
+    signer: RequestContextSigner,
+) -> MCPServer:
+    """Create one long-lived, tenant-independent document MCP server."""
 
-
-def create_search_service() -> DocumentSearchService:
-    raise NotImplementedError(
-        "Wire the existing DenseRetriever factory here."
+    server = MCPServer(
+        name="document-mcp-server",
+        title="Enterprise Document MCP Server",
+        description="MCP server exposing tenant-scoped enterprise document capabilities.",
+        version="0.1.0",
     )
 
-
-# 1. Use the clean decorator. 
-# The server will automatically read the types (str, int) and docstring descriptions!
-@server.tool(
-    name="search_documents",
-    description="Search tenant-scoped enterprise documents and return relevant evidence."
-)
-async def search_documents(
-    query: str,
-    top_k: int = 5,
-) -> list[dict]:
-    """
-    Search tenant-scoped enterprise documents.
-
-    :param query: Natural-language search query.
-    :param top_k: Maximum number of results.
-    """
-
-    """
-    MCP adapter for tenant-scoped document search.
-
-    IMPORTANT:
-    Tenant identity is trusted runtime context.
-    It is not supplied by the MCP caller.
-    """
-
-    tenant_context = TenantContext(
-        tenant_id=UUID("00000000-0000-0000-0000-000000000001"),
-        user_id=UUID("00000000-0000-0000-0000-000000000002"),
-        roles=("user",),
-        permissions=("document:read",),
-        enabled_services=("document_search",),
+    server.middleware.append(
+        lambda ctx, call_next: request_identity_middleware(
+            ctx,
+            call_next,
+            signer=signer,
+        )
     )
 
-    search_service = create_search_service()
+    search_service = DocumentSearchService(retriever_factory=retriever_factory)
 
-    return search_service.search(
-        tenant_context=tenant_context,
-        query=query,
-        top_k=top_k,
+    @server.tool(
+        name="search_documents",
+        description=(
+            "Search tenant-scoped enterprise documents "
+            "and return relevant evidence."
+        ),
     )
+    async def search_documents(
+        query: str = Field(
+            min_length=1,
+            description="Natural-language document search query.",
+        ),
+        top_k: int = Field(
+            default=5,
+            ge=1,
+            le=50,
+            description="Maximum number of results to return.",
+        ),
+        ctx: Context | None = None,
+    ) -> list[dict]:
+        """Search documents using the authenticated request identity.
 
+        `ctx` is injected by MCP and is not part of the model-visible input
+        schema. Tenant/user identity comes exclusively from middleware-bound
+        authenticated state.
+        """
+        if ctx is None:
+            raise RuntimeError("MCP request context is required")
 
-async def main() -> None:
-    await server.run_stdio_async()
+        application_context = get_request_context()
+        return search_service.search(
+            tenant_context=application_context.to_tenant_context(),
+            query=query,
+            top_k=top_k,
+        )
 
-if __name__ == "__main__":
-    asyncio.run(main())
+    return server
