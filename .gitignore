@@ -46,3 +46,4 @@ docker-data/
 # Python packaging
 *.egg-info/
 build
+uv.lock

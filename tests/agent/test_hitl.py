@@ -307,6 +307,7 @@ def make_state(
         "status": "pending",
         "tenant_id": tenant_id,
         "requester_id": requester_id,
+        "approval_id": str(uuid4()),
         "approval_decision": {},
         "approver_id": "",
         "approval": False,
@@ -345,6 +346,7 @@ def test_sensitive_action_pauses_for_human_approval():
         "message": "Approve this sensitive action?",
         "tenant_id": tenant_id,
         "requester_id": requester_id,
+        "approval_id": result["__interrupt__"][0].value["approval_id"],
     }
 
 

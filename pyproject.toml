@@ -20,7 +20,10 @@ dependencies = [
     "faiss-cpu>=1.15,<2.0",
     "langchain",
     "langchain-ollama",
-    "langgraph"
+    "langgraph",
+    "torch>=2.2.0",
+    "mcp[cli]==2.3.0",
+    "mcp-types==2.3.0"
 ]
 
 [build-system]

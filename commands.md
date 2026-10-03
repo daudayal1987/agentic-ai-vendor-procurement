@@ -104,3 +104,9 @@ docker compose exec api python -c "import jwt; print(jwt.__version__)"
 
     > alembic current
     > alembic heads
+
+## MCP
+    > Running server
+        python app/mcp/document_server.py
+        mcp dev app/mcp/document_server.py
+        npx @modelcontextprotocol/inspector python app/mcp/document_server.py
